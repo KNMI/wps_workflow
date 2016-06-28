@@ -28,7 +28,7 @@ import traceback
 
 #print __dir__
 
-print "/usr/people/mihajlov/python/clipc/clipccombine"
+print "/usr/people/mihajlov/python/clipc/clipccombine clean"
 print "CLIPC dispel4py running"
 
 class Collector(GenericPE):
@@ -204,7 +204,7 @@ class Writer(GenericPE):
                 #self.file[index]=f[1]
                 #print "writefile:",index
                 #print "ANDREJOUT..."
-                name = "d4pout/output"+index+".nc"
+                name = "output"+index+".nc"
                 
                 self.file[index] = (name , clipc_combine_process_d4p.write( f[1] , name , "dr drej n spinuso rock the data flow."))
 
