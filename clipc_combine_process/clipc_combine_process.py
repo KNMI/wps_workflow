@@ -1,0 +1,126 @@
+# python
+# clipc combine process
+# combine two netCDFs
+# knmi team
+# author: andrej
+# clipc@knmi.nl
+#
+
+import netCDF4
+import combine_netcdf
+import random
+import numpy as operator
+import wcsrequest
+
+def defaultCallback(message,percentage):
+  print "defaultCallback: "+message
+
+#
+# two netCDF files combined by operator into one along all dimmensions, should be same...
+#
+
+ops = { "+": operator.add , 
+          "-": operator.subtract , 
+          "*": operator.multiply , 
+          "/": operator.divide }
+
+
+def combine_two_indecies_netcdf( netCDF1, netCDF2, operator_symbol, output, norm1, norm2, callback=defaultCallback):
+
+  #id data layer (3dims...)
+  variable1 = getTitleNC(netCDF1)
+
+  variable2 = getTitleNC(netCDF2)
+
+  #RANDOM NAME FOR NC COMBINE... CHANGE...
+  name = output #'test_combine_'+str(random.getrandbits(128))+'.nc'
+  des  = 'KNMI pywps process combines two climate indecies. clipc@knmi.nl'
+
+  # define operator functions
+  ops = { "+": operator.add , 
+          "-": operator.subtract , 
+          "*": operator.multiply , 
+          "/": operator.divide }
+
+  # parse operator symbol to function
+  op_char = operator_symbol
+  op_func = ops[op_char]
+  #result = op_func(a, b)
+
+  combi = combine_netcdf.combineNetCDFs( name, netCDF1 , variable1 , netCDF2 , variable2 , des , op_func, norm1 , norm2 ,callback=callback)
+  
+  return combi , name
+
+# end
+
+# two urls opened as netCDF files and combined with operator allong all dimensions
+#
+def combine_two_indecies(url1,url2,operation,output, norm1 , norm2 ,callback=defaultCallback):
+
+  nc1 = netCDF4.Dataset(url1,'r')
+
+  nc2 = netCDF4.Dataset(url2,'r')
+
+  callback("nc1 time received: "+str(netCDF4.num2date( nc1.variables['time'][0] , nc1.variables['time'].units ,calendar='standard')),3)
+  callback("nc2 time received: "+str(netCDF4.num2date( nc2.variables['time'][0] , nc2.variables['time'].units ,calendar='standard')),3)
+
+  nc_combination , combi_name = combine_two_indecies_netcdf(nc1, nc2, operation, output, norm1 , norm2 ,callback=callback)
+
+  callback("combo time received: "+str(netCDF4.num2date( nc_combination.variables['time'][0] , nc_combination.variables['time'].units ,calendar='standard')),3)
+
+
+  nc_combination.setncattr('CLIPC_url1' , str(url1))
+  nc_combination.setncattr('CLIPC_url2' , str(url2))
+  nc_combination.setncattr('CLIPC_combination_operator' ,str(operation))
+
+  return nc_combination , combi_name
+
+def getTitleNC(nc_fid):
+  var = None
+  for k1 , v in nc_fid.variables.iteritems():
+    if "grid_mapping" in v.ncattrs():
+      var = k1
+  return var
+
+def combine_two_indecies_wcs(wcs_url1, 
+  wcs_url2, 
+  operator_symbol,
+  norm1="normnone" , 
+  norm2="normnone" , 
+  bbox=None , 
+  time1=None , 
+  time2=None ,
+  output_file1='nc1.nc',
+  output_file2='nc2.nc',
+  output_file3='combine.nc' ,
+  width=200,
+  height=200,
+  callback=defaultCallback,
+  certfile=None):
+
+  # wcs combo
+  defaultCallback('Combine Two Web Coverage Service operations with: '+str(operator_symbol),1)
+  defaultCallback('wcs url1: '+str(wcs_url1),1)
+  defaultCallback('wcs url2: '+str(wcs_url2),1)
+  defaultCallback('bbox:     '+str(bbox),1)
+  defaultCallback('time1:    '+str(time1),1)
+  defaultCallback('time2:    '+str(time2),1)
+  defaultCallback('height:   '+str(height),1)
+  defaultCallback('width:    '+str(width),1)
+
+  nc1 = wcsrequest.getWCS(wcs_url1, bbox, time1, output_file1,width=width,height=height,callback=callback,certfile=certfile)
+
+  nc2 = wcsrequest.getWCS(wcs_url2, bbox, time2, output_file2,width=width,height=height,callback=callback,certfile=certfile)  
+  
+  defaultCallback("Combining",2);
+  
+  nc_output , nc_out = combine_two_indecies( nc1 , nc2 , operator_symbol , output_file3 , norm1 , norm2 , callback=callback)
+  
+  defaultCallback("Combining ready",3);
+  
+  nc_output.setncattr('CLIPC_url1' , str(wcs_url1))
+  nc_output.setncattr('CLIPC_url2' , str(wcs_url2))
+
+  return nc1 , nc2 , nc_out
+
+# end 
