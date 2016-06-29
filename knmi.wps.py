@@ -1,6 +1,9 @@
-from pywps.Process import Status
+from pywps.Process import Status, WPSProcess
 from pprint import pprint
 import json
+import os
+from dispel4py import provenance
+
 #
 # run from run.wps.here.py (this allows the local cgi to be used...)
 # author: ANDREJ
@@ -18,7 +21,7 @@ class MyStatus(Status):
 status = MyStatus()
 
 
-from pywps.Process import WPSProcess
+
 
 
 ### Basic Example applies to most ..
@@ -38,43 +41,79 @@ class KNMIWpsProcess(WPSProcess):
                             statusSupported = True,
                             grassLocation =False)
 
-        self.pipein = self.addComplexInput(identifier="pipein",
-                        title="Input file",
-                        abstract="Input vector file, usually in GML format",
-                        formats = [
-                                    # gml
-                                    #{mimeType: 'text/xml',
-                                    #encoding:'utf-8',
-                                    #schema:'http://schemas.opengis.net/gml/3.2.1/gml.xsd'},
-                                    
-                                    # json
-                                    {
-                                     'mimeType': 'text/plain',
-                                     'encoding': 'iso-8859-2',
-                                     'schema': None
-                                    }
-                                    #{
-                                    #'mimeType': 'application/json'
-                                    #}
 
-                                    #,
-                                    # kml
-                                    #{mimeType: 'text/xml',
-                                    #encoding: 'windows-1250',
-                                    #schema: 'http://schemas.opengis.net/kml/2.2.0/ogckml22.xsd'}
-                                    ],
-                        # we need at least TWO input files, maximal 5
-                        minOccurs= 1,
-                        maxOccurs= 100
-                        #,
-                        #metadata: {'foo':'bar','spam':'eggs'}
-                    )
+        self.pipein = self.addLiteralInput( identifier = "pipein" ,
+                                            title      = "Input json file" ,
+                                            type       = type("string"),
+                                            default    = None 
+                                        ) 
 
+
+
+
+    '''
+        self.pipein = self.addComplexInput( identifier="pipein",
+                                            title="Input json file",
+                                            abstract="Input vector file, usually in GML format",
+                                            formats = [
+                                                        # gml
+                                                        #{mimeType: 'text/xml',
+                                                        #encoding:'utf-8',
+                                                        #schema:'http://schemas.opengis.net/gml/3.2.1/gml.xsd'},
+                                                        
+                                                        # json
+                                                        {
+                                                         'mimeType': 'text/plain',
+                                                         'encoding': 'iso-8859-2',
+                                                         'schema': None
+                                                        },
+                                                        {
+                                                        'mimeType': 'application/json'
+                                                        }
+
+                                                        #,
+                                                        # kml
+                                                        #{mimeType: 'text/xml',
+                                                        #encoding: 'windows-1250',
+                                                        #schema: 'http://schemas.opengis.net/kml/2.2.0/ogckml22.xsd'}
+                                                        ],
+                                            # we need at least TWO input files, maximal 5
+                                            minOccurs= 1,
+                                            maxOccurs= 100
+                                            #,
+                                            #metadata: {'foo':'bar','spam':'eggs'}
+                                        )
+    '''
 
     def execute(self):
-        pprint(self.pipein.getValue())
+        self.status.set("start",0);
+        
+        jsondata = json.loads(self.pipein.getValue())
 
-        self.status.set("ready",100);
+        print( jsondata )
+
+
+
+        with open( '/tmp/input.json' ,'wr') as outf:
+            #json_str = json.dump( jsondata ,outf)
+            #outf.write("\n")
+            outf.write(json.dumps(jsondata))
+            outf.write("\n")
+            outf.flush()
+            outf.close()
+
+
+        # 
+        # python -m dispel4py.new.processor multi clipc -n 12 -f jsondata
+        stdoutdata, stderrdata = provenance.commandChain([["{}".format(
+                                                    "python -m dispel4py.new.processor multi clipc -n 12 -f /tmp/input.json"
+                                                    )]],os.environ.copy())
+
+        print stdoutdata
+
+        print stderrdata
+
+        self.status.set("done",100);
 
 
 
@@ -82,14 +121,11 @@ class KNMIWpsProcess(WPSProcess):
 knmiprocess = KNMIWpsProcess()
 
 json_data=open('input.json').read()
-data = json.loads(json_data)
+#data = json.loads(json_data)
 
-pprint(json_data)
+#print json_data
 
-knmiprocess.pipein.setValue( data )
-#knmiprocess.inputs['weight'].setValue( {'value' : 'normminmax' } )
-#knmiprocess.inputs['variable'].setValue( {'value' : 'vDTR' } )
-#knmiprocess.inputs['tags'].setValue( {'value' : 'ale' } )
+knmiprocess.pipein.setValue( {'value': json_data } )
 
 knmiprocess.status = status
 knmiprocess.execute()
