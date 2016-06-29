@@ -18,6 +18,7 @@ from clipc_combine_process import serve_netcdf_d4p
 import matplotlib.pyplot as plt
 import traceback
 
+from pprint import pprint
 
 # project: CLIP_C
 # authors: Alessandro and Andrej
@@ -237,14 +238,24 @@ class Writer(GenericPE):
                 name , nc   = self.file.pop(index)
 
                 # postprocess var and (nc , name)
+
+
                 x = clipc_combine_process_d4p.postprocess( self.var.pop(index) , name , nc[0] , nc[1])
                 
                 #x[0].close()
                 "Writer_process: DONE ", name
 
-                self.write('final',name)
+                meta = {}
+                for key, val in nc[0].attrs.items():
+                    #print key,'=', val
+                    #meta[str(key)] = str(val)
+                    meta[str(key)]=str(val)
+                print "++++++++++++++++++DATEST"
+                print meta
+
+                self.write('final',name, metadata=[meta])
         except KeyError:
-            pass
+             pass
         except:
             #print "andrej exception send " , index , " in file" , self.file.keys() 
             #print "andrej exception send " , index , " in var " , self.var.keys()
