@@ -1,7 +1,7 @@
-# clipccombine
+# WPS combine with workflows
 
 WPS D4P Combine Framework
-Allows the combination of multiple datasets. Using standard normalisation functions and basic arithmetic parametars via numpy.
+Allows a pipline to perform the combination of multiple datasets. Using standard normalisation functions and basic arithmetic parametars via numpy. 
 
 authors: Andrej, Alessandr (KNMI)
 Code: python 2.7
