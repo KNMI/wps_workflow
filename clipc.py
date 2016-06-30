@@ -48,19 +48,24 @@ class Collector(GenericPE):
         url1 = inputs['input'][0]
         #oper = inputs['input'][2]
         url2 = inputs['input'][1]
-     
+        
+        oper = inputs['input'][2]
+
         index = str(self.counter)
     
         # first  url collected
         #nc1 = clipc_combine_process_d4p.collect(url1)
         #self.write('output_R',(  index , 0 , nc1 ))
-        self.write('output_R',(  index , 0 , url1 ))
+
+        self.write('output_R',(  index , 0 , url1 , "" ),
+            location=url1, format='application/netCDF', metadata={'source':url1})
     
         #second url collected
         #counter = counter + 1
         #nc2 = clipc_combine_process_d4p.collect(url2)
         #self.write('output_R',( index , 1 , nc2 ))
-        self.write('output_R',(  index , 1 , url2 ))
+        self.write('output_R',(  index , 1 , url2 , oper),
+            location=url2, format='application/netCDF', metadata={'source':url2})
 
         #print nc1
         # output written...
@@ -86,24 +91,39 @@ class Collector(GenericPE):
 #     print data
 #     return {'_d4p_prov':prov,'_d4p_data':data*data}
 
+
+class NetCDFReader(GenericPE):
+
+   def __init__(self):
+        GenericPE.__init__(self)
+        self._add_input('input', grouping=[1])
+        self._add_output('output')
+        
+   def _process(self,inputs):
     
+       nc = clipc_combine_process_d4p.collect(inputs['input'][2])
+
+       var , norm = clipc_combine_process_d4p.read(nc)
+       self.write('output',( inputs['input'][0] , inputs['input'][1] , var , norm),metadata={'var':str(var)})
+    
+
 def reader(data):
     #nc = clipc_combine_process_d4p.collect(url)
     #print "reader with data:" , str(data)
     #print data[0] ,  data[1]
 
-    print 'reader ',data[0]
-    print 'reader ',data[1]
-    print 'reader ',data[2]
+    print 'reader data[0]:',data[0]
+    print 'reader data[1]:',data[1]
+    print 'reader data[2]:',data[2]
+    print 'reader data[3]:',data[3]
 
     nc = clipc_combine_process_d4p.collect(data[2])
 
     var , norm = clipc_combine_process_d4p.read(nc)
 
-    print 'reader ', type(var)
-    print 'reader ', type(norm)
-
-    return ( data[0] , data[1] , var , norm)
+    prov={'metadata':{'var':str(var)}}
+    
+    return {'_d4p_prov':prov,'_d4p_data': ( data[0] , data[1] ,data[2] , var , norm)}
 
 
 ##################################
@@ -132,23 +152,29 @@ class Match(GenericPE):
         #print inp[1]
         #print len(inp[2])                
         #print inp[3]
+        print "MATCH input is ", inp
         
         #inputs(str(0),element,var,norm)
         self.log( "received counter "+inp[0])
         
-        k = str(inp[0])
+        self.log( "match in "+str(inp[0]))
+        self.log( "match in "+str(inp[1]))
+        self.log( "match in "+str(inp[2]))
+        self.log( "match in "+str(inp[3]))
+
+        k = str(inp[0]) # counter as str
         if k not in self._accumulator.keys():
             self._accumulator[k] = {} 
         
         self._accumulator[k][inp[1]] = ( inp[2] , inp[3] ) 
         
         # if( len(self._accumulator ) == 2 ):
-        if( len(self._accumulator[str(inp[0])].keys() ) == 2 ):
+        if( len(self._accumulator[k].keys() ) == 2 ):
             #combine(self._accumulator)
             
             output = self._accumulator.pop(k)
             
-            self.write('output_X', (k , output[0] , output[1]) )
+            self.write('output_X', (k , output[0] , output[1] , output[2]) )
 
             #print self._accumulator[k].keys()
             
@@ -161,8 +187,11 @@ class Match(GenericPE):
         #nc2 = clipc_combine_process_d4p.collect(url2)
         #self.write('output_R',nc2)
         
-def combine(data,operator):
-  
+#def combine(data,operator):
+def combine(data): 
+
+    operator = data[3]#??? pass at match...
+
     comb_var = clipc_combine_process_d4p.combine( data[1][0] , data[1][1] , data[2][0] , data[2][1] , operator)
     
     #print "combineindex:",data[0]
@@ -176,13 +205,14 @@ def combine(data,operator):
     
 class Writer(GenericPE):
 
-    def __init__(self,op):
+    #def __init__(self,op):
+    def __init__(self):    
         GenericPE.__init__(self)
 #        self._add_input('file' , grouping=('prov',[0]))
 #        self._add_input('var'  , grouping=('prov',[0]))
         self._add_input('file' , grouping=[0])
         self._add_input('var'  , grouping=[0])
-        self._opp = op
+
         self._accumulator = []
         self._add_output('final')
         
@@ -209,8 +239,6 @@ class Writer(GenericPE):
                 
                 self.file[index] = (name , clipc_combine_process_d4p.write( f[1] , name , "dr drej n spinuso rock the data flow."))
 
-                print self.file[index]
-
             elif 'var' in inputs:
                 v = inputs['var']   
                 #print "writevar:",type(v[1])
@@ -223,15 +251,7 @@ class Writer(GenericPE):
         except:
             print "exception for writer input: " , index 
             traceback.print_exc(file=sys.stdout)
-            return
-        
-        print "Writer_process: FUTURE WARNING?"
-        print "Writer_process: index",index
-        print "Writer_process: ",type(self)
-        print "Writer_process: ",type(self.var)
-        #print "Writer_process: ",type(self.var[index])    
-        print "Writer_process: ",self.file
-        #print "Writer_process: ",type(self.file[index])   
+            return 
 
         try:
             if (self.var[index] is not None and self.file[index] is not None):
@@ -250,14 +270,12 @@ class Writer(GenericPE):
                     #print key,'=', val
                     #meta[str(key)] = str(val)
                     meta[str(key)]=str(val)
-                print "++++++++++++++++++DATEST"
-                print meta
 
-                self.write('final',name, metadata=[meta])
+                self.write('final',name,metadata=meta)
         except KeyError:
              pass
         except:
-            #print "andrej exception send " , index , " in file" , self.file.keys() 
+            print "write exception send " , index , " in file" , self.file.keys() 
             #print "andrej exception send " , index , " in var " , self.var.keys()
             #traceback.print_stack()
             traceback.print_exc(file=sys.stdout)
@@ -277,12 +295,7 @@ class Visualiser(GenericPE):
             
         name =  inputs['input']
         
-        print "Visualiser_process ", name
-        print "Visualiser_process ", type(name)   
-
         nc = clipc_combine_process_d4p.collect(name)
-
-        print "Visualiser_process ", nc
 
         # breaks here have a look...
         #serve_netcdf_d4p.visualise1( fig , nc  )
@@ -294,21 +307,24 @@ class Visualiser(GenericPE):
 
 
 
-sc1 = Collector()
-sc1.name = 'collector'
+collector = Collector()
+collector.name = 'collector'
 
-sc2 = Match()
-sc2.name = 'match'
+match = Match()
+match.name = 'match'
 
-sc3 = Writer("-")
-sc3.name = 'writer'
+#writer = Writer("-")
+writer = Writer()
+writer.name = 'writer'
 
 sc4 = Visualiser()
 sc4.name = 'vizu'
 
 read=SimpleFunctionPE(reader)
-comb=SimpleFunctionPE(combine,{"operator":"-"})
- 
+#read=NetCDFReader()
+
+#comb=SimpleFunctionPE(combine,{"operator":"-"})
+comb=SimpleFunctionPE(combine) 
 
 #processes=[readn,multn]
 #chain = create_iterative_chain(processes, FunctionPE_class=SimpleFunctionPE)
@@ -317,12 +333,12 @@ comb=SimpleFunctionPE(combine,{"operator":"-"})
 graph = WorkflowGraph()
 
 #Common way of composing the graph
-graph.connect(sc1,'output_R',read,'input')
-graph.connect(read,'output', sc2,'input')
-graph.connect(sc2,'output_X',comb,'input')
-graph.connect(comb,'output',sc3,'var')
-graph.connect(sc1,'output_W',sc3,'file')
-graph.connect(sc3,'final',sc4,'input')
+graph.connect(collector,'output_R',read,'input')
+graph.connect(read,'output', match,'input')
+graph.connect(match,'output_X',comb,'input')
+graph.connect(comb,'output',writer,'var')
+graph.connect(collector,'output_W',writer,'file')
+#graph.connect(writer,'final',sc4,'input')
 
 # Alternatively with pipeline array
 #Create pipelines from functions
@@ -381,9 +397,9 @@ InitiateNewRun(graph,ProvenanceRecorderToServiceBulk,
 
 # In[ ]:
 
-from dispel4py.visualisation import display
+#from dispel4py.visualisation import display
 
-display(graph)
+#display(graph)
 
 
 
