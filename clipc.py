@@ -123,7 +123,7 @@ def reader(data):
 
     prov={'metadata':{'var':str(var)}}
     
-    return {'_d4p_prov':prov,'_d4p_data': ( data[0] , data[1] ,data[2] , var , norm)}
+    return {'_d4p_prov':prov,'_d4p_data': ( data[0] , data[1] , var , norm , data[3] )}
 
 
 ##################################
@@ -161,6 +161,7 @@ class Match(GenericPE):
         self.log( "match in "+str(inp[1]))
         self.log( "match in "+str(inp[2]))
         self.log( "match in "+str(inp[3]))
+        self.log( "match in "+str(inp[4]))
 
         k = str(inp[0]) # counter as str
         if k not in self._accumulator.keys():
@@ -174,33 +175,32 @@ class Match(GenericPE):
             
             output = self._accumulator.pop(k)
             
-            self.write('output_X', (k , output[0] , output[1] , output[2]) )
+            self.write('output_X', (k , output[0] , output[1] , inp[4] ) )
 
             #print self._accumulator[k].keys()
             
-        #nc1 = clipc_combine_process_d4p.collect(url1)
-        #self.write('output_R',nc1)
-   
-        #nc_out = clipc_combine_process_d4p.write(nc1 , "output.nc" , "dr drej n spinuso rock the data flow.")
-        #self.write('output_W',nc_out)
-        
-        #nc2 = clipc_combine_process_d4p.collect(url2)
-        #self.write('output_R',nc2)
         
 #def combine(data,operator):
 def combine(data): 
 
-    operator = data[3]#??? pass at match...
+    operator = data[3] #??? pass at match...
 
-    comb_var = clipc_combine_process_d4p.combine( data[1][0] , data[1][1] , data[2][0] , data[2][1] , operator)
+    comb_var = clipc_combine_process_d4p.combine(   data[1][0] , 
+                                                    data[1][1] , 
+                                                    data[2][0] , 
+                                                    data[2][1] , 
+                                                    operator)
     
     #print "combineindex:",data[0]
     #print "combineindex:",type(data[1][0])
     #print "combineindex:",type(data[2][0])
     #print "combineindex:",type(comb_var)
 
-    return ( data[0] , comb_var)
-
+    #return ( data[0] , comb_var)
+    
+    prov={'metadata':{'k':data[0],'operator':operator}}
+    
+    return {'_d4p_prov':prov,'_d4p_data': ( data[0] , comb_var) }
 
     
 class Writer(GenericPE):
