@@ -1,7 +1,7 @@
 {
 	"collector": [{
-		"input": [    "http://opendap.knmi.nl/knmi/thredds/dodsC/CLIPC/knmi/RCM/EUR-44/No_BC/tas/hd17_icclim-4-2-3_KNMI_ens-multiModel_rcp85_r1i1p1_SMHI-RCA4_v1_EUR-44_yr_20060101-20991231.nc"
-                	, "http://opendap.knmi.nl/knmi/thredds/dodsC/CLIPC/knmi/RCM/EUR-44/No_BC/tas/hd17_icclim-4-2-3_KNMI_ens-multiModel_rcp45_r1i1p1_SMHI-RCA4_v1_EUR-44_yr_20060101-20991231.nc"
-			, "+" ]
+		"input":[    "data/newA.nc"
+                	, "data/newOut.nc"
+                ]
     }]
 }

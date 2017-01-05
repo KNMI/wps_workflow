@@ -266,12 +266,15 @@ Example implementation::
         Allows for preprocessing of data to be written to the output pipe.
         This method should be overridden by PE base classes.
         '''
+        #self.log(type(self))
         self._write(name, data)
+        
 
     def _write(self, name, data, **kwargs):
         '''
         This writes the 'data' to the output pipe with name 'name' of this PE.
         '''
+         
         try:
             output = self.outputconnections[name]
             output[WRITER].write(data)

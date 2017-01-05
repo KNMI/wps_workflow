@@ -160,7 +160,7 @@ class SimpleProcessingWrapper(GenericWrapper):
         return result
 
     def _write(self, name, data):
-        # self.pe.log('Writing %s to %s' % (data, name))
+        #self.pe.log('SP Writing %s to %s' % (data, name))
         try:
             self.outputs[name].extend(data)
         except KeyError:

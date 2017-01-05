@@ -166,7 +166,7 @@ class GroupByCommunication(object):
         self.destinations = destinations
         self.input_name = input_name
         self.name = groupby
-
+        
     def getDestination(self, data):
         output = tuple([data[self.input_name][x] for x in self.groupby])
         dest_index = abs(make_hash(output)) % len(self.destinations)
@@ -203,6 +203,10 @@ def _getConnectedInputs(node, graph):
 
 
 def _getNumProcesses(size, numSources, numProcesses, totalProcesses):
+    
+    if (numProcesses>1) or (numProcesses==0):
+        return numProcesses
+    
     div = max(1, totalProcesses - numSources)
     return int(numProcesses * (size - numSources) / div)
 
@@ -233,7 +237,7 @@ def _assign_processes(workflow, size):
         node_counter = 0
         for node in graph.nodes():
             pe = node.getContainedObject()
-            prcs = 1 if pe.id in sources else _getNumProcesses(
+            prcs = 1 if pe.id in sources or (hasattr(pe, 'single') and pe.single==True) else _getNumProcesses(
                 size, numSources, pe.numprocesses, totalProcesses)
             processes[pe.id] = range(node_counter, node_counter + prcs)
             node_counter = node_counter + prcs
@@ -322,6 +326,25 @@ def get_partitions(workflow):
     try:
         partitions = workflow.partitions
     except AttributeError:
+        print ("no predefined partitions")
+        sourcePartition = []
+        otherPartition = []
+        graph = workflow.graph
+        for node in graph.nodes():
+            pe = node.getContainedObject()
+            if not _getConnectedInputs(node, graph):
+                sourcePartition.append(pe)
+            else:
+                otherPartition.append(pe)
+        partitions = [sourcePartition, otherPartition]
+        workflow.partitions = partitions
+    return partitions
+
+def get_partitions_adv(workflow):
+    try:
+        partitions = workflow.partitions
+    except AttributeError:
+        print ("no predefined partitions")
         sourcePartition = []
         otherPartition = []
         graph = workflow.graph
@@ -644,7 +667,7 @@ class SimpleWriter(object):
         self.results = {}
 
     def write(self, output_name, data):
-        # self.pe.log('Writing %s to %s' % (data, output_name))
+        #self.pe.log('SPE Writing %s to %s' % (data, output_name))
         try:
             destinations = self.output_mappings[output_name]
             dest_data = data
@@ -665,12 +688,16 @@ class SimpleWriter(object):
             if self.result_mappings is None:
                 self.simple_pe.wrapper._write((self.pe.id, output_name),
                                               [data])
+                
         # now check if the output is in the named results
         # (in case of a Tee) then data gets written to the PE results as well
         try:
+            
             if output_name in self.result_mappings[self.pe.id]:
                 self.simple_pe.wrapper._write((self.pe.id, output_name),
                                               [data])
+                
+                #self.pe.log('SPE Writing %s to %s' % (data, output_name))
         except:
             pass
 
@@ -749,7 +776,7 @@ def parse_common_args():   # pragma: no cover
     parser = create_arg_parser()
     return parser.parse_known_args()
 
-
+import time
 def main():   # pragma: no cover
     from importlib import import_module
 
@@ -774,9 +801,14 @@ def main():   # pragma: no cover
         # no other arguments required for target
         pass
     process = getattr(import_module(target), 'process')
-    error_message = process(graph, inputs=inputs, args=args)
-    if error_message:
-        print(error_message)
+    elapsed_time=0
+    start_time = time.time()
+    errormsg = process(graph, inputs=inputs, args=args)
+    if errormsg:
+        print(errormsg)
+        
+    print ("ELAPSED TIME: "+str(time.time()-start_time))
+    
 
 if __name__ == "__main__":  # pragma: no cover
     main()

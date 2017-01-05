@@ -125,6 +125,7 @@ class WorkflowGraph(object):
         if self.graph.has_edge(fromWfNode, toWfNode):
             self.graph[fromWfNode][toWfNode]['ALL_CONNECTIONS']\
                 .append((fromConnection, toConnection))
+                
         else:
             self.graph.add_edge(fromWfNode, toWfNode,
                                 **{'FROM_CONNECTION': fromConnection,
@@ -322,6 +323,9 @@ def drawDot(graph):   # pragma: no cover
     '''
     from subprocess import Popen, PIPE
     dot = draw(graph)
+    nodelist = graph.getContainedObjects()
+     
+    #p = Popen(['dot', '-T', 'svg','-o','dot.svg'], stdout=PIPE, stdin=PIPE, stderr=PIPE)
     p = Popen(['dot', '-T', 'png'], stdout=PIPE, stdin=PIPE, stderr=PIPE)
     stdout, stderr = p.communicate(dot.encode('utf-8'))
     return stdout

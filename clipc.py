@@ -374,19 +374,19 @@ graph.connect(collector,'output_W',writer,'file')
 #get_ipython().magic(u'matplotlib inline')
 
 # prov service recorder bulk url...
-ProvenanceRecorderToServiceBulk.REPOS_URL='http://verce-portal-dev.scai.fraunhofer.de/j2ep-1.0/prov/workflow/insert'
+#ProvenanceRecorderToServiceBulk.REPOS_URL='http://verce-portal-dev.scai.fraunhofer.de/j2ep-1.0/prov/workflow/insert'
 
 #unique id for process.
-rid='RDWD_'+getUniqueId()
+#rid='RDWD_'+getUniqueId()
 
-InitiateNewRun(graph,ProvenanceRecorderToServiceBulk,
-    provImpClass=ProvenancePE,
-    username='andrej',
-    runId=rid,
-    w3c_prov=False,
-    workflowName="test_rdwd",
-    workflowId="xx",
-    description=sys.argv[1])
+#InitiateNewRun(graph,ProvenanceRecorderToServiceBulk,
+#    provImpClass=ProvenancePE,
+#    username='andrej',
+#    runId=rid,
+#    w3c_prov=False,
+#    workflowName="test_rdwd",
+#    workflowId="xx",
+#    description=sys.argv[1])
 
 #simple_process.process_and_return(graph, input_data)
 
