@@ -32,6 +32,8 @@ from dispel4py.new import simple_process
 from subprocess import Popen, PIPE
 import collections
 from copy import deepcopy
+import pip
+import inspect
 
 
 from itertools import chain
@@ -379,8 +381,15 @@ class ProvenancePE(GenericPE):
             return self.statemap[name]
         else:
             return None
-
-    def makeUniqueId(self, **kwargs):
+        
+        
+    def makeProcessId(self, **kwargs):
+        
+        return socket.gethostname() + "-" + \
+            str(os.getpid()) + "-" + str(uuid.uuid1())
+            
+            
+    def makeUniqueId(self,data,port):
         #if ('data' in kwargs):
         #    self.log(str(kwargs['data']))
         
@@ -394,9 +403,8 @@ class ProvenancePE(GenericPE):
         self.statemapId.append(id)
 
 
-    def getUniqueId(self,**kwargs):
-        #self.log(kwargs)
-        data_id = self.makeUniqueId(**kwargs)
+    def getUniqueId(self,data,port,**kwargs):
+        data_id = self.makeUniqueId(data,port)
         if 'name' in kwargs:
             self._updateState(kwargs['name'],data_id)
 
@@ -461,7 +469,7 @@ class ProvenancePE(GenericPE):
 
         # self.appParameters = None
         self.provon = True
-        self.embed = False
+        
 
         if 'save_mode' not in kwargs:
             self.save_mode=ProvenancePE.SAVE_MODE_FILE
@@ -509,7 +517,7 @@ class ProvenancePE(GenericPE):
 
     def _preprocess(self):
         self.instanceId = self.name + "-Instance-" + \
-            "-" + self.getUniqueId()
+            "-" + self.makeProcessId()
 
         super(ProvenancePE, self)._preprocess()
 
@@ -558,13 +566,11 @@ class ProvenancePE(GenericPE):
             self.derivationIds = []
             #self.resetflow = False
 
-    def extractItemMetadata(self, data, port='output'):
+    def extractItemMetadata(self, data, port):
 
         return {}
     
-    def embedProvIntoData(self,dataid,location):
-        self.log("Embedding trace into data:"+ProvenancePE.PROV_EXPORT_URL)
-
+     
     def preprocess(self):
         if self.save_mode==ProvenancePE.SAVE_MODE_SERVICE:
             self.provurl = urlparse(ProvenancePE.REPOS_URL)
@@ -597,7 +603,7 @@ class ProvenancePE(GenericPE):
                 self.connection.close()
                 self.bulk_prov[:]=[]
             elif (self.save_mode==ProvenancePE.SAVE_MODE_FILE):
-                filep = open(ProvenancePE.PROV_PATH + "/bulk_" + self.makeUniqueId(), "wr")
+                filep = open(ProvenancePE.PROV_PATH + "/bulk_" + self.makeProcessId(), "wr")
                 ujson.dump(self.bulk_prov, filep)
                 filep.write(ujson.dumps(self.bulk_prov))
             elif (self.save_mode==ProvenancePE.SAVE_MODE_SENSOR):
@@ -670,7 +676,7 @@ class ProvenancePE(GenericPE):
             filep = open(
                 ProvenancePE.PROV_PATH +
                 "/bulk_" +
-                self.makeUniqueId(),
+                self.makeProcessId(),
                 "wr")
             ujson.dump(self.bulk_prov, filep)
             #filep.write(json.dumps(self.bulk_prov))
@@ -716,9 +722,7 @@ class ProvenancePE(GenericPE):
                         self.sendProvToService(trace['metadata'])
                     if self.save_mode==ProvenancePE.SAVE_MODE_FILE:
                          self.writeProvToFile(trace['metadata'])
-                    if self.embed:
-                         self.embedProvIntoData(trace['metadata']['streams'][0]['id'],trace['metadata']['streams'][0]['location'])
-                         None
+                     
             except:
                 self.log(traceback.format_exc())
                 'if cant write doesnt matter move on'
@@ -816,7 +820,7 @@ class ProvenancePE(GenericPE):
 
     def __markIteration(self):
         self.startTime = datetime.datetime.utcnow()
-        self.iterationId = self.name + '-' + self.getUniqueId()
+        self.iterationId = self.name + '-' + self.makeProcessId()
 
     def __computewrapper(self, inputs):
 
@@ -885,21 +889,21 @@ class ProvenancePE(GenericPE):
                 metadata.update({'iterationId': self.iterationId,
                 # identifies the actual writing process'
                 'actedOnBehalfOf': self.behalfOf,
-                '_id': self.id + '_write_' + str(self.getUniqueId()),
+                '_id': self.id + '_write_' + str(self.makeProcessId()),
                 'iterationIndex': self.iterationIndex,
                 'instanceId': self.instanceId,
                 'annotations': {}})
 
                 if self.feedbackIteration:
                     metadata.update(
-                        {'_id': self.id + '_feedback_' + str(self.getUniqueId())})
+                        {'_id': self.id + '_feedback_' + str(self.makeProcessId())})
                 elif not self.resetflow:
                     metadata.update(
-                        {'_id': self.id + '_stateful_' + str(self.getUniqueId())})
+                        {'_id': self.id + '_stateful_' + str(self.makeProcessId())})
 
                 else:
                     metadata.update(
-                        {'_id': self.id + '_write_' + str(self.getUniqueId())})
+                        {'_id': self.id + '_write_' + str(self.makeProcessId())})
 
 
                 metadata.update({'stateful': not self.resetflow,
@@ -1120,7 +1124,7 @@ class ProvenancePE(GenericPE):
         streamItem = {}
         streammeta = []
 
-        streammeta = self.extractItemMetadata(data)
+        streammeta = self.extractItemMetadata(data,kwargs['output_port'])
         
         if not isinstance(streammeta, list):
             streammeta = kwargs['metadata'] if isinstance(
@@ -1141,9 +1145,9 @@ class ProvenancePE(GenericPE):
             
         if not self.provon:
             return streamItem
-        
+        #self.log(kwargs)
         streamItem.update({"content": streammeta,
-                           "id": self.getUniqueId(data=data,**kwargs),
+                           "id": self.getUniqueId(data,kwargs['output_port'],**kwargs),
                            "format": "",
                            "location": "",
                            "annotations": [],
@@ -1174,8 +1178,8 @@ class ProvenancePE(GenericPE):
 
                         del self.derivationIds[self.derivationIds.index(j)]
     
-    def extractExternalInputDataId(self,data):
-        self.makeUniqueId()
+    def extractExternalInputDataId(self,data,port):
+        self.makeUniqueId(data,port)
         
 
     def buildDerivation(self, data, port=""):
@@ -1190,7 +1194,7 @@ class ProvenancePE(GenericPE):
             self.derivationIds.append(derivation)
 
         except Exception:
-            id=self.extractExternalInputDataId(data)
+            id=self.extractExternalInputDataId(data,port)
             derivation = {'port': port, 'DerivedFromDatasetID':
                           id, 'TriggeredByProcessIterationID':
                           None, 'prov_cluster':
@@ -1235,7 +1239,20 @@ class ProvenancePE(GenericPE):
 ' or subgraph with ProvenancePE type or its specialization'
 meta =True
 
-def injectProv(object, provType, active=True,componentsType=None, **kwargs):
+def get_source(object, spacing=10, collapse=1):
+    """Print methods and doc strings.
+
+    Takes module, class, list, dictionary, or string."""
+    methodList = [e for e in dir(object) if callable(getattr(object, e))]
+    processFunc = collapse and (lambda s: " ".join(s.split())) or (lambda s: s)
+    source= "\n".join(["%s %s" %
+                     (method.ljust(spacing),
+                      processFunc(str(getattr(object, method).__doc__)))
+                     for method in methodList])
+    return source
+
+
+def injectProv(object, provType, active=True,componentsType=None, source={},**kwargs):
     print('Change grouping implementation ')
 
     dispel4py.new.processor.GroupByCommunication.getDestination = \
@@ -1245,7 +1262,7 @@ def injectProv(object, provType, active=True,componentsType=None, **kwargs):
         object.flatten()
         nodelist = object.getContainedObjects()
         for x in nodelist:
-            injectProv(x, provType, componentsType=componentsType, **kwargs)
+            injectProv(x, provType, componentsType=componentsType, source=source,**kwargs)
     else:
         print("Injecting provenance to: " + object.name +
               " Original type: " + str(object.__class__.__bases__))
@@ -1279,7 +1296,13 @@ def injectProv(object, provType, active=True,componentsType=None, **kwargs):
         print("Injecting provenance to: " + object.name +
               " Transoformed: " + str(object.__class__.__bases__))
         object.name = localname
-
+        
+        code=""
+        for x in inspect.getmembers(object.__class__, predicate=inspect.ismethod):
+            code+=inspect.getsource(x[len(x)-1])+'\n'
+            
+        source.update({object.id:{'type':str(object.__class__.__bases__),'code':code}})
+    return source
 
 ' This methods enriches the graph to enable the production and recording '
 ' of run-specific provenance information the provRecorderClass parameter '
@@ -1314,7 +1337,9 @@ def profile_prov_run(
         raise Exception("Missing values")
     if runId is None:
         runId = getUniqueId()
-
+    
+    source=injectProv(graph, provImpClass, componentsType=componentsType,save_mode=save_mode,controlParameters={'username':username,'runId':runId},skip_rules=skip_rules)
+    
     newrun = NewWorkflowRun(save_mode)
 
     newrun.parameters = {"input": input,
@@ -1325,7 +1350,8 @@ def profile_prov_run(
                          "workflowName": workflowName,
                          "runId": runId,
                          "mapping": sys.argv[1],
-                         "skip_rules":skip_rules
+                         "skip_rules":skip_rules,
+                         "source":source
                          }
     _graph = WorkflowGraph()
     provrec = None
@@ -1342,8 +1368,6 @@ def profile_prov_run(
 
     # newrun.provon=True
     simple_process.process(_graph, {'NewWorkflowRun': [{'input': 'None'}]})
-
-    injectProv(graph, provImpClass, componentsType=componentsType,save_mode=save_mode,controlParameters={'username':username,'runId':runId},skip_rules=skip_rules)
 
     if (provRecorderClass!=None):
         print("PREPARING PROVENANCE SENSORS:")
@@ -1510,7 +1534,9 @@ class NewWorkflowRun(ProvenancePE):
             system_id=None,
             workflowName=None,
             w3c=False,
-            runId=None):
+            runId=None,
+            modules=None,
+            source=None):
 
         bundle = {}
         if username is None or workflowId is None or workflowName is None:
@@ -1531,6 +1557,8 @@ class NewWorkflowRun(ProvenancePE):
             bundle["workflowName"] = workflowName
             bundle["mapping"] = self.parameters['mapping']
             bundle["type"] = "workflow_run"
+            bundle["modules"] = modules
+            bundle["source"] = source
 
         return bundle
 
@@ -1544,7 +1572,10 @@ class NewWorkflowRun(ProvenancePE):
             description=self.parameters["description"],
             system_id=self.parameters["system_id"],
             workflowName=self.parameters["workflowName"],
-            runId=self.parameters["runId"])
+            runId=self.parameters["runId"],
+            modules=sorted(["%s==%s" % (i.key, i.version) for i in pip.get_installed_distributions()]),
+            source=self.parameters["source"])
+            
         print("RUN Metadata: " + str(bundle))
 
         self.write('output', bundle, metadata=bundle)
