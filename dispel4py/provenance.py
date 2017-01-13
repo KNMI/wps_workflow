@@ -1576,7 +1576,7 @@ class NewWorkflowRun(ProvenancePE):
             modules=sorted(["%s==%s" % (i.key, i.version) for i in pip.get_installed_distributions()]),
             source=self.parameters["source"])
             
-        print("RUN Metadata: " + str(bundle))
+        self.log("STORING WORKFLOW RUN METADATA")
 
         self.write('output', bundle, metadata=bundle)
 
