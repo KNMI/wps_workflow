@@ -1098,6 +1098,7 @@ class ProvenancePE(GenericPE):
                 self.removeDerivation(name=d)
 
     def checkSkipRule(self,streammeta):
+        self.log("Checking Skip-Rules")
         for key in self.skip_rules:
                 for s in streammeta:
                     if key in s: 
