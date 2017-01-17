@@ -553,7 +553,7 @@ class ProvenancePE(GenericPE):
         #        None
 
         if not self.resetflow:
-            self.log('VOID ITERATION CAPTURE, RESET FLOW: '+str(self.void_iteration)+" RESET "+str(self.resetflow))
+            #self.log('VOID ITERATION CAPTURE, RESET FLOW: '+str(self.void_iteration)+" RESET "+str(self.resetflow))
             if self.provon:
                 
                 #self.extractProvenance(self, output_port=None)
