@@ -553,9 +553,9 @@ class ProvenancePE(GenericPE):
         #        None
 
         if not self.resetflow:
-
+            self.log('VOID ITERATION CAPTURE, RESET FLOW: '+str(self.void_iteration)+" RESET "+str(self.resetflow))
             if self.provon:
-
+                
                 #self.extractProvenance(self, output_port=None)
                 try:
                     None#self.derivationIds = [self.derivationIds.pop()]
@@ -786,8 +786,9 @@ class ProvenancePE(GenericPE):
                 return data
             else:
                 for x in data:
+                    self.log(data[x])
                     self.buildDerivation(data[x], port=x)
-                    if '_d4p' in data[x]:
+                    if type(data[x])==dict and '_d4p' in data[x]:
                         inputs[x] = data[x]['_d4p']
                     else:
                         inputs[x] = data[x]
@@ -1102,17 +1103,21 @@ class ProvenancePE(GenericPE):
         for key in self.skip_rules:
                 for s in streammeta:
                     if key in s: 
-                        #self.log("A"+str(self.skip_rules[key]))
-                        #self.log(s[key]) 
-                        #self.log(type(s[key]))
-                        #self.log(type(self.skip_rules[key]['$lt']))
+                        self.log("A"+str(self.skip_rules[key]))
+                        self.log(s[key]) 
+                        self.log(type(s[key]))
+                        self.log(type(self.skip_rules[key]['$lt']))
                         if '$eq' in self.skip_rules[key] and s[key]==self.skip_rules[key]['$eq']:
                             return False
+                        elif '$gt' in self.skip_rules[key] and '$lt' in self.skip_rules[key]:
+                            if (s[key]>self.skip_rules[key]['$gt'] and s[key]<self.skip_rules[key]['$lt']):
+                                self.log("GT-LT") 
+                                return False
                         elif '$gt' in self.skip_rules[key] and s[key]>self.skip_rules[key]['$gt']:
-                            return False
-                        elif '$gt' in self.skip_rules[key] and'$lt' in self.skip_rules[key] and (s[key]>self.skip_rules[key]['$gt'] and s[key]<self.skip_rules[key]['$lt']):
+                            self.log("GT") 
                             return False
                         elif '$lt' in self.skip_rules[key] and s[key]<self.skip_rules[key]['$lt']:
+                            self.log("LT") 
                             return False
                         else:
                             return self.provon
@@ -1317,7 +1322,7 @@ prov_save_mode={}
 
 def profile_prov_run(
         graph,
-        provRecorderClass,
+        provRecorderClass=None,
         provImpClass=ProvenancePE,
         input=[],
         username=None,
