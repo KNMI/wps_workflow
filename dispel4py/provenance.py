@@ -1103,10 +1103,7 @@ class ProvenancePE(GenericPE):
         for key in self.skip_rules:
                 for s in streammeta:
                     if key in s: 
-                        self.log("A"+str(self.skip_rules[key]))
-                        self.log(s[key]) 
-                        self.log(type(s[key]))
-                        self.log(type(self.skip_rules[key]['$lt']))
+                        self.log(str(self.skip_rules[key]))
                         if '$eq' in self.skip_rules[key] and s[key]==self.skip_rules[key]['$eq']:
                             return False
                         elif '$gt' in self.skip_rules[key] and '$lt' in self.skip_rules[key]:
