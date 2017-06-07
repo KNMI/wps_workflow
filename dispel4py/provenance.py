@@ -437,11 +437,11 @@ class ProvenancePE(GenericPE):
         if 'pe_class' in kwargs and kwargs['pe_class'] != GenericPE:
             self.impcls = kwargs['pe_class']
        
-        if 'skip_rules' in kwargs and self.name in kwargs['skip_rules']:
-            print(self.name+" "+str(kwargs['skip_rules'][self.name]))
-            self.skip_rules = kwargs['skip_rules'][self.name]
+        if 'sel_rules' in kwargs and self.name in kwargs['sel_rules']:
+            print(self.name+" "+str(kwargs['sel_rules'][self.name]))
+            self.sel_rules = kwargs['sel_rules'][self.name]
         else:
-            self.skip_rules=None
+            self.sel_rules=None
         
         if 'creator' not in kwargs:
             self.creator = None
@@ -597,7 +597,7 @@ class ProvenancePE(GenericPE):
                                     params,
                                     headers)
                 response = self.connection.getresponse()
-                self.log("Postprocress: " +
+                self.log("Postprocess: " +
                      str((response.status, response.reason, response.read())))
 #                    response.read())))
                 self.connection.close()
@@ -605,7 +605,6 @@ class ProvenancePE(GenericPE):
             elif (self.save_mode==ProvenancePE.SAVE_MODE_FILE):
                 filep = open(ProvenancePE.PROV_PATH + "/bulk_" + self.makeProcessId(), "wr")
                 ujson.dump(self.bulk_prov, filep)
-                filep.write(ujson.dumps(self.bulk_prov))
             elif (self.save_mode==ProvenancePE.SAVE_MODE_SENSOR):
                 super(
                                   ProvenancePE,
@@ -665,19 +664,22 @@ class ProvenancePE(GenericPE):
 
 
     def writeProvToFile(self, prov):
-
+        
         if isinstance(prov, list) and "data" in prov[0]:
             prov = prov[0]["data"]
         
          
-
+        #self.log('PROCESS: '+str(prov))
         self.bulk_prov.append(prov)
+        
+        
         if len(self.bulk_prov) == ProvenancePE.BULK_SIZE:
             filep = open(
                 ProvenancePE.PROV_PATH +
                 "/bulk_" +
                 self.makeProcessId(),
                 "wr")
+            #self.log('PROCESS: '+str(filep))
             ujson.dump(self.bulk_prov, filep)
             #filep.write(json.dumps(self.bulk_prov))
             self.bulk_prov[:]=[]
@@ -786,7 +788,7 @@ class ProvenancePE(GenericPE):
                 return data
             else:
                 for x in data:
-                    self.log(data[x])
+                    #self.log(data[x])
                     self.buildDerivation(data[x], port=x)
                     if type(data[x])==dict and '_d4p' in data[x]:
                         inputs[x] = data[x]['_d4p']
@@ -1034,7 +1036,7 @@ class ProvenancePE(GenericPE):
             metadata.update(attributes)
         usermeta = {}
 
-        if 'con:skip' in control and bool(control['con:skip']):
+        if 's-prov:skip' in control and bool(control['s-prov:skip']):
             self.provon = False
         else:
             self.provon = True
@@ -1061,7 +1063,7 @@ class ProvenancePE(GenericPE):
     format: typically contains the mime-type of the data.
     errors: users may identify erroneous situations and classify and describe
     them using this parameter.
-    control: are the control instructions like con:skip and con:immediateAccess
+    control: are the control instructions like s-prov:skip and s-prov:immediateAccess
     respectively selectively producing traces for the data stream
     passing through the component and trigger- ing data transfer
     operations for the specific intermediate ele- ment, towards
@@ -1098,24 +1100,27 @@ class ProvenancePE(GenericPE):
             for d in kwargs['dep']:
                 self.removeDerivation(name=d)
 
-    def checkSkipRule(self,streammeta):
+    def checkSelectiveRule(self,streammeta):
         self.log("Checking Skip-Rules")
-        for key in self.skip_rules:
+        for key in self.sel_rules:
                 for s in streammeta:
                     if key in s: 
-                        self.log(str(self.skip_rules[key]))
-                        if '$eq' in self.skip_rules[key] and s[key]==self.skip_rules[key]['$eq']:
-                            return False
-                        elif '$gt' in self.skip_rules[key] and '$lt' in self.skip_rules[key]:
-                            if (s[key]>self.skip_rules[key]['$gt'] and s[key]<self.skip_rules[key]['$lt']):
+                        self.log("A"+str(self.sel_rules[key]))
+                        self.log(s[key]) 
+                        self.log(type(s[key]))
+                        self.log(type(self.sel_rules[key]['$lt']))
+                        if '$eq' in self.sel_rules[key] and s[key]==self.sel_rules[key]['$eq']:
+                            return True
+                        elif '$gt' in self.sel_rules[key] and '$lt' in self.sel_rules[key]:
+                            if (s[key]>self.sel_rules[key]['$gt'] and s[key]<self.sel_rules[key]['$lt']):
                                 self.log("GT-LT") 
-                                return False
-                        elif '$gt' in self.skip_rules[key] and s[key]>self.skip_rules[key]['$gt']:
+                                return True
+                        elif '$gt' in self.sel_rules[key] and s[key]>self.sel_rules[key]['$gt']:
                             self.log("GT") 
-                            return False
-                        elif '$lt' in self.skip_rules[key] and s[key]<self.skip_rules[key]['$lt']:
+                            return True
+                        elif '$lt' in self.sel_rules[key] and s[key]<self.sel_rules[key]['$lt']:
                             self.log("LT") 
-                            return False
+                            return True
                         else:
                             return self.provon
         return self.provon
@@ -1143,8 +1148,8 @@ class ProvenancePE(GenericPE):
                 traceback.print_exc(file=sys.stderr)
                 None
         
-        if self.skip_rules!=None:
-            self.provon=self.checkSkipRule(streammeta)
+        if self.sel_rules!=None:
+            self.provon=self.checkSelectiveRule(streammeta)
             
         if not self.provon:
             return streamItem
@@ -1254,6 +1259,7 @@ def get_source(object, spacing=10, collapse=1):
                      for method in methodList])
     return source
 
+namespaces={}
 
 def injectProv(object, provType, active=True,componentsType=None, source={},**kwargs):
     print('Change grouping implementation ')
@@ -1261,6 +1267,8 @@ def injectProv(object, provType, active=True,componentsType=None, source={},**kw
     dispel4py.new.processor.GroupByCommunication.getDestination = \
         getDestination_prov
     global meta
+    
+    
     if isinstance(object, WorkflowGraph):
         object.flatten()
         nodelist = object.getContainedObjects()
@@ -1271,12 +1279,15 @@ def injectProv(object, provType, active=True,componentsType=None, source={},**kw
               " Original type: " + str(object.__class__.__bases__))
         parent = object.__class__.__bases__[0]
         localname = object.name
+        
+        
+         
 
         # if not isinstance(object,provType):
         #    provType.__init__(object,pe_class=parent, **kwargs)
 
         #if(meta):
-        #print(str(componentsType))
+         
         if componentsType!=None and object.name in componentsType:
             body = {}
             for x in componentsType[object.name]:
@@ -1305,6 +1316,8 @@ def injectProv(object, provType, active=True,componentsType=None, source={},**kw
             code+=inspect.getsource(x[len(x)-1])+'\n'
             
         source.update({object.id:{'type':str(object.__class__.__bases__),'code':code}})
+        if hasattr(object, 'ns'):
+            namespaces.update(object.ns)
     return source
 
 ' This methods enriches the graph to enable the production and recording '
@@ -1333,7 +1346,7 @@ def profile_prov_run(
         clustersRecorders={},
         feedbackPEs=[],
         save_mode='file',
-        skip_rules={}
+        sel_rules={}
         ):
 
     if username is None or workflowId is None or workflowName is None:
@@ -1341,7 +1354,7 @@ def profile_prov_run(
     if runId is None:
         runId = getUniqueId()
     
-    source=injectProv(graph, provImpClass, componentsType=componentsType,save_mode=save_mode,controlParameters={'username':username,'runId':runId},skip_rules=skip_rules)
+    source=injectProv(graph, provImpClass, componentsType=componentsType,save_mode=save_mode,controlParameters={'username':username,'runId':runId},sel_rules=sel_rules)
     
     newrun = NewWorkflowRun(save_mode)
 
@@ -1353,8 +1366,9 @@ def profile_prov_run(
                          "workflowName": workflowName,
                          "runId": runId,
                          "mapping": sys.argv[1],
-                         "skip_rules":skip_rules,
-                         "source":source
+                         "sel_rules":sel_rules,
+                         "source":source,
+                         "ns":namespaces
                          }
     _graph = WorkflowGraph()
     provrec = None
@@ -1539,7 +1553,8 @@ class NewWorkflowRun(ProvenancePE):
             w3c=False,
             runId=None,
             modules=None,
-            source=None):
+            source=None,
+            ns=None):
 
         bundle = {}
         if username is None or workflowId is None or workflowName is None:
@@ -1562,6 +1577,9 @@ class NewWorkflowRun(ProvenancePE):
             bundle["type"] = "workflow_run"
             bundle["modules"] = modules
             bundle["source"] = source
+            bundle["ns"] = ns
+            
+             
 
         return bundle
 
@@ -1577,7 +1595,8 @@ class NewWorkflowRun(ProvenancePE):
             workflowName=self.parameters["workflowName"],
             runId=self.parameters["runId"],
             modules=sorted(["%s==%s" % (i.key, i.version) for i in pip.get_installed_distributions()]),
-            source=self.parameters["source"])
+            source=self.parameters["source"],
+            ns=self.parameters["ns"])
             
         self.log("STORING WORKFLOW RUN METADATA")
 
