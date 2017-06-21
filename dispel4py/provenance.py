@@ -922,7 +922,7 @@ class ProvenancePE(GenericPE):
                 
                 elif self.ignore_state==True:
                     self.log("IGNOOOORING STTEEEE: "+metadata['_id'])
-                    derivations = [x for x in self.derivationIds if x['iterationIndex'] == self.iterationIndex]
+                    derivations = [x for x in self.derivationIds if (x['iterationIndex'] == self.iterationIndex or x['port']=='_d4p_state')]
                     metadata.update({'derivationIds': derivations})
                     #self.ignore_state = False
                 else:
@@ -1332,16 +1332,9 @@ class StateUpdateType(ProvenancePE):
             self.update_prov_state('avg',data,ignore_inputs=False)
             self.discardInFlow()
         if (event=='write' and port != 'avg'):
-            self.log("AAAADA")
-            self.ignore_state=True
+            self.ignoreState()
        
-        #elif (event=='void_iteration' and value==True):
-	    #    self.resetflow=False
-
-   #     elif (event=='void_iteration' and value==False):
-    #        self.discardInFlow()
-
-   #     elif (event=='write'):
+    
 
 
 
