@@ -417,10 +417,10 @@ class ProvenancePE(GenericPE):
     def apply_flow_reset_policy(self,event,value,port=None,data=None):
         
         if (event=='void_iteration') and value==True:
-            self.discardInFlow()
+            self.discardInFlow(discardState=True)
         
         if (event=='void_iteration') and value==False:
-            self.discardInFlow()
+            self.discardInFlow(discardState=True)
 
     def pe_init(self, *args, **kwargs):
         #ProvenancePE.__init__(self,*args, **kwargs)
@@ -479,7 +479,7 @@ class ProvenancePE(GenericPE):
         self.resetflow = False
         self.stateUpdateIndex=0
         self.ignore_inputs = False
-        self.ignore_state = False
+        self.ignore_past_flow = False
         self.derivationIds = list()
         self.iterationIndex = 0
         self.behalfOf = self.id 
@@ -547,7 +547,7 @@ class ProvenancePE(GenericPE):
         #if (self.void_iteration==True):
         self.apply_flow_reset_policy('void_iteration',self.void_iteration)
         
-        
+    
 
     def extractItemMetadata(self, data, port):
 
@@ -626,7 +626,7 @@ class ProvenancePE(GenericPE):
             prov = prov[0]["data"]
 
         self.bulk_prov.append(deepcopy(prov))
-        self.log("TO SERVICE ________________ID: "+str(self.bulk_prov))
+        
         if len(self.bulk_prov) > ProvenancePE.BULK_SIZE:
             #self.log("TO SERVICE ________________ID: "+str(self.bulk_prov))
             params = urllib.urlencode({'prov': ujson.dumps(self.bulk_prov)})
@@ -707,7 +707,7 @@ class ProvenancePE(GenericPE):
                             
 
                     if self.save_mode==ProvenancePE.SAVE_MODE_SERVICE:
-                        self.log("SENDING: "+trace['metadata']['_id'])
+                        
                         self.sendProvToService(trace['metadata'])
                     if self.save_mode==ProvenancePE.SAVE_MODE_FILE:
                          self.writeProvToFile(trace['metadata'])
@@ -860,12 +860,12 @@ class ProvenancePE(GenericPE):
                     streamtransfer[
                         "port"] = port
                     if port=='_d4p_state':
-                        self.log(''' Building SELF Derivation '''+str(trace))
+                        #self.log(''' Building SELF Derivation '''+str(trace))
                         self._updateState('_d4p_state',trace[
                         'metadata']["streams"][0]['id'])
                         self.buildDerivation(streamtransfer,port='_d4p_state')
                         #if self.resetflow==True:
-						#    self.discardOutFlow()
+                        #    self.discardOutFlow()
                         #self.resetflow=True
                 except:
                     pass
@@ -876,8 +876,8 @@ class ProvenancePE(GenericPE):
                 traceback.format_exc()
             raise
 
-    def ignoreState(self):
-        self.ignore_state=True
+    def ignorePastFlow(self):
+        self.ignore_past_flow=True
 
 
     def packageAll (self, contentmeta):
@@ -920,18 +920,15 @@ class ProvenancePE(GenericPE):
                     metadata.update({'derivationIds': derivations})
                     self.ignore_inputs = False
                 
-                elif self.ignore_state==True:
-                    self.log("IGNOOOORING STTEEEE: "+metadata['_id'])
+                elif self.ignore_past_flow==True:
+                    
                     derivations = [x for x in self.derivationIds if (x['iterationIndex'] == self.iterationIndex or x['port']=='_d4p_state')]
                     metadata.update({'derivationIds': derivations})
-                    #self.ignore_state = False
+                    #self.ignore_past_flow = False
                 else:
-                    #if self.resetflow==True:
-            	    #    self.discardOutFlow()
-                    self.log("NOOOT IGNOOOORING STTEEEE: "+metadata['_id'])
-                    self.log("INSERT DERIV: "+str(self.derivationIds))
+                     
                     metadata.update({'derivationIds': self.derivationIds})
-                    self.ignore_state = False
+                    self.ignore_past_flow = False
 
 
                 metadata.update({'name': self.name,
@@ -962,8 +959,6 @@ class ProvenancePE(GenericPE):
             #os.getpid()
              }
 
-        if self.ignore_state==True:
-             self.log("DADADADAD :"+str(output))
 
         return output
 
@@ -992,6 +987,7 @@ class ProvenancePE(GenericPE):
         
         
         if discardState==True:
+            self.log("discarding")
             self.derivationIds=[]
         else:
             maxit=0
@@ -1024,7 +1020,7 @@ class ProvenancePE(GenericPE):
     ):
 
         self.endTime = datetime.datetime.utcnow()
-        #self.resetflow = stateless
+        self.resetflow = stateless
         self.ignore_inputs = ignore_inputs
         self.addprov=True
         kwargs['name']=name
@@ -1237,7 +1233,7 @@ class ProvenancePE(GenericPE):
         
 
     def buildDerivation(self, data, port=""):
-		
+        
         try:
 
             derivation = {'port': port, 'DerivedFromDatasetID':
@@ -1250,7 +1246,7 @@ class ProvenancePE(GenericPE):
            # if port=="_d4p_state": 
            #     derivation.update({'iterationIndex':self.iterationIndex})
                  
-		    
+            
 
             self.derivationIds.append(derivation)
 
@@ -1304,10 +1300,12 @@ class AccumulateFlowType(ProvenancePE):
         
     
     def apply_flow_reset_policy(self,event,value,port=None,data=None):
-        self.log(port)
          
+        
+        if (event=='write'):
+            self.discardInFlow() 
             
-        if (event=='void_iteration') and value==False:
+        if (event=='void_iteration' and value==False):
             self.discardInFlow()
         
          
@@ -1316,6 +1314,24 @@ class AccumulateFlowType(ProvenancePE):
 
 
  
+
+class MultiOutputStateUpdateType(ProvenancePE):
+    STATEFUL_PORT='avg'
+    def __init__(self):
+        ProvenancePE.__init__(self)
+        
+    
+    def apply_flow_reset_policy(self,event,value,port=None,data=None):
+         
+        self.ignore_past_flow=False
+        self.ignore_inputs=False
+        if (event=='write' and port == 'avg'):
+            self.update_prov_state('avg',data,ignore_inputs=False)
+            self.discardInFlow()
+        if (event=='write' and port != 'avg'):
+            self.ignorePastFlow()
+        if (event=='void_iteration' and value==False):
+            self.discardInFlow(discardState=True)
         
 
 class StateUpdateType(ProvenancePE):
@@ -1325,14 +1341,16 @@ class StateUpdateType(ProvenancePE):
         
     
     def apply_flow_reset_policy(self,event,value,port=None,data=None):
-        self.log(port)
-        self.ignore_state=False
+         
+        self.ignore_past_flow=False
         self.ignore_inputs=False
         if (event=='write' and port == 'avg'):
             self.update_prov_state('avg',data,ignore_inputs=False)
             self.discardInFlow()
         if (event=='write' and port != 'avg'):
-            self.ignoreState()
+            self.ignorePastFlow()
+        if (event=='void_iteration' and value==False):
+            self.discardInFlow(discardState=True)
        
     
 
@@ -1354,7 +1372,7 @@ class StatefulFLowType(ProvenancePE):
         
     
     def apply_flow_reset_policy(self,event,value,port=None):
-        self.log(port)
+         
         if (event=='write'):
             self.resetflow=False
             
